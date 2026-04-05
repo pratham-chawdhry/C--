@@ -27,7 +27,7 @@ bool isValidVariable(char* input) {
     if (!isalpha(input[0]) && input[0] != '_') {
         return false;
     }
-    for (int i = 1; i < strlen(input); i++) {
+    for (int i = 1; i < (int)strlen(input); i++) {
         if (!isalnum(input[i]) && input[i] != '_') {
             return false;
         }
@@ -43,9 +43,9 @@ bool isnotInitialised(int no_of_variables, char* variableName) {
     }
     return true;
 }
- 
+
 void create_variable(int spaces,char **chararr,int no_of_variables){
-    char* str = "int\0";
+    char* str = "int";
     char* new_var;
     for (int i = 0; i < spaces + 1; i++){
         if (strcmp (chararr[i], str) == 0){
@@ -57,63 +57,58 @@ void create_variable(int spaces,char **chararr,int no_of_variables){
             }
             else if (!isValidVariable(new_var)){
                 printf("Invalid variable name: %s\n", new_var);
-                exit(0);
+                exit(1);
             }
             else if (!isnotInitialised(no_of_variables, new_var)){
                 printf("Variable already initialised: %s\n", new_var);
-                exit(0);
+                exit(1);
             }
             break;
         }
     }
-    //printf("%s ", myvars[0].name);
 }
 
-// void assign_variable(int spaces, char **chararr, int no_of_variables){
 void assign_variable(int spaces,int no_of_variables,char* token,char** chararr){
-    char* equal = "=\0";
-    char* new_var;
-    bool flag = false;
+    char* equal = "=";
     int i;
 
     for (i = 0; i < spaces + 1; i++){
         if (strcmp (chararr[i], equal) == 0){
             break;
         }
-        // printf("%s ", chararr[i]);
     }
 
     if (i > 0 && isnotInitialised(no_of_variables, chararr[i-1])){
             printf("Variable not initialised: %s\n", chararr[i-1]);
-            exit(0);
+            exit(1);
     }
 
-    //printf("%s ", chararr[i+1]);
     int value;
-
     int variable_index = i - 1;
-    char algebra[100] = "Hello\0";
-    char *null_c = "\0";
-    char *space = " \0";
+    char algebra[1024];
+    algebra[0] = '\0';
+    char *null_c = "";
+    char *space = " ";
     if (i + 1 <= spaces && (strcmp(chararr[i+1],null_c))!=0){
         if (isNumber(chararr[i + 1])){
             strcpy(algebra,chararr[i + 1]);
         }
         else if (chararr[i+1][0] == '('){
-            char* bracket = "(\0";
-            strcpy(algebra,bracket);
+            strcat(algebra, "(");
             char* rest = modified_eqn_slicing(1,strlen(chararr[i+1]),chararr[i+1]);
 
             if (isValidVariable(rest)){
                 value = get_variable_value(rest,no_of_variables);
-                sprintf(algebra,"%s%d",algebra, value);
+                char temp[32];
+                sprintf(temp, "%d", value);
+                strcat(algebra, temp);
             }
             else if (isNumber(rest)){
                 strcat(algebra,rest);
             }
             else {
                 printf("Invalid type : %s\n", rest);
-                exit(0);
+                exit(1);
             }
         }
         else if (isValidVariable(chararr[i+1])){
@@ -121,22 +116,18 @@ void assign_variable(int spaces,int no_of_variables,char* token,char** chararr){
             sprintf(algebra,"%d", value);
         }
         else {
-            printf("Undefined print command : %s\n", token);
-            exit(0);
+            printf("Undefined command : %s\n", token);
+            exit(1);
         }
         strcat(algebra,space);
         i = i + 2;
     }
     else {
-        printf("Nothing to print: %s?\n", chararr[i]);
-        exit(0);
+        printf("Nothing to assign: %s?\n", chararr[i]);
+        exit(1);
     }
 
-    // printf("%s", algebra);
-    // printf("%s",chararr[i]);
-
     for (int j = i; j < spaces + 1; j++){
-        //printf("%s ", chararr[j]);
         if (isNumber(chararr[j])){
             strcat(algebra,chararr[j]);
             strcat(algebra,space);
@@ -146,118 +137,84 @@ void assign_variable(int spaces,int no_of_variables,char* token,char** chararr){
             strcat(algebra,space);
         }
         else if (chararr[j][0] == '('){
-            char* bracket = "(\0";
-            strcat(algebra,bracket);
+            strcat(algebra, "(");
             char* rest = modified_eqn_slicing(1,strlen(chararr[j]),chararr[j]);
 
             if (isValidVariable(rest)){
                 value = get_variable_value(rest,no_of_variables);
-                sprintf(algebra,"%s%d",algebra, value);
+                char temp[32];
+                sprintf(temp, "%d", value);
+                strcat(algebra, temp);
             }
             else if (isNumber(rest)){
                 strcat(algebra,rest);
             }
             else {
                 printf("Invalid type : %s\n", rest);
-                exit(0);
+                exit(1);
             }
         }
         else if (chararr[j][strlen(chararr[j]) - 1] == ')'){
-            char* bracket = ")\0";
             char* rest = modified_eqn_slicing(0,strlen(chararr[j])-1,chararr[j]);
 
             if (isValidVariable(rest)){
                 value = get_variable_value(rest,no_of_variables);
-                sprintf(algebra,"%s%d",algebra, value);
+                char temp[32];
+                sprintf(temp, "%d", value);
+                strcat(algebra, temp);
             }
             else if (isNumber(rest)){
                 strcat(algebra,rest);
             }
             else {
                 printf("Invalid type : %s\n", rest);
-                exit(0);
+                exit(1);
             }
-            strcat(algebra,bracket);
+            strcat(algebra, ")");
         }
         else if (isValidVariable(chararr[j])){
             value = get_variable_value(chararr[j],no_of_variables);
-            sprintf(algebra,"%s%d",algebra,value);
+            char temp[32];
+            sprintf(temp, "%d", value);
+            strcat(algebra, temp);
             strcat(algebra,space);
         }
-        // printf("%s\n", algebra);
     }
 
-    //printf("%s\n", algebra);
     char* result = (char*)malloc(sizeof(char) * (strlen(algebra) + 1));
     strcpy(result,algebra);
-    result = helper(result);
-    // result = BODMAS(result);
-
-    // for (int k = i; k < spaces + 1; k++){
-    //     if (isValidVariable(chararr[k])){
-    //         int value = get_variable_value(chararr[k],no_of_variables);
-    //     }
-    //     strcat(algebra,chararr[k]);
-    //     strcat(algebra,space);
-    // }
-
-    // char* result = (char*)malloc(sizeof(char) * (strlen(algebra) + 1));
-    // strcpy(result,algebra);
-    // result = BODMAS(result);
+    char* final_res = helper(result);
 
     for (int i = 0; i < no_of_variables; i++){
         if (strcmp(myvars[i].name, chararr[variable_index]) == 0){
-            myvars[i].values = (char*)malloc(sizeof(char) * (strlen(result) + 1));
-            strcpy(myvars[i].values, result);
+            if (myvars[i].values) free(myvars[i].values);
+            myvars[i].values = (char*)malloc(sizeof(char) * (strlen(final_res) + 1));
+            strcpy(myvars[i].values, final_res);
             break;
         }
     }
-
-    // printf(" The answer is %s\n", result);
+    free(final_res);
 }
 
 int get_variable_value(char *var_name,int no_of_variables){
-    char* str = "int\0";
-    char* str_1 = "if\0";
+    char* str = "int";
+    char* str_1 = "if";
     if (strcmp(var_name, str) == 0 || strcmp(var_name, str_1) == 0){
         printf("%s is a keyword. Invalid variable name: %s\n", var_name, var_name);
-        exit(0);
+        exit(1);
     }
     if (strlen(var_name) == 0  || !isValidVariable(var_name)){
         printf("Invalid variable name: %s\n", var_name);
-        exit(0);
+        exit(1);
     }
     for (int i = 0; i < no_of_variables; i++){
         if (strcmp(myvars[i].name, var_name) == 0){
             if (myvars[i].values == NULL){
                 printf("Variable has no value: %s\n", var_name);
-                exit(0);
+                exit(1);
             }
-            // printf("%s\n", myvars[i].name);
             return atoi(myvars[i].values);
         }
     }
     return -1;
 }
-
-// char* eqn_join(char **arr){
-//     char str[100] = "Hello\0";
-//     strcpy(str,arr[0]);
-//     char* space = " \0";
-//     strcat(str, space);
-
-//     int size = 0;
-
-//     while (arr[size] != NULL) {
-//         size++;
-//     }
-
-//     for (int i = 1; i < size; i++) {
-//         strcat(str, arr[i]);
-//         strcat(str, space);
-//     }
-//     char* result = malloc(strlen(str) + 1);
-//     strcpy(result,str);
-
-//     return result;
-// }

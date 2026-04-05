@@ -298,7 +298,7 @@ char* corrected_equation(char* token){
                 token[i] == '*' || token[i] == '+' || 
                 token[i] == '-') && operator_flag){
             printf("Error : Invalid operator\n");
-            exit(0);
+            exit(1);
         }
     }
     char* token_1 = (char*)malloc(strlen(equation)+1);

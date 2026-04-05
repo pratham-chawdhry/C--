@@ -11,240 +11,265 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-#define MAX_SIZE 100
-
-bool result = true;
-
-int* arr;
-char* chararr;
 int no_of_variables = 0;
 
-int whitespaces(char* token){
-    int spaces = 0;
-    bool flag = true;
-    for (int i = 0; i < strlen(token); i++){
-        if (token[i] == ' '){
-            if (flag) continue;
-            else spaces++;
-            flag = true;
-        }
-        else {
-            flag = false;
-            continue;
-        }
-    }
-    return spaces;
+static char* skip_ws(char* p) {
+    while (*p && isspace((unsigned char)*p)) p++;
+    return p;
 }
 
-int* arr_whitespaces(int spaces, char*token){
-    int* arr = malloc(sizeof(int) * (spaces+2));
-    bool flag = true;
-    int index = 0;
-    int j = 0;
-    while (true){
-        if (token[j] != ' '){
-            arr[index++] = j;
-            j++;
-            break;
-        }
-        if (token[j+1] != ' '){
-            arr[index++] = j;
-            j++;
-            break;
-        }
-        j++;
+static char* get_block(char** pp) {
+    char* p = *pp;
+    p = skip_ws(p);
+    if (*p != '{') return NULL;
+    p++;
+    char* start = p;
+    int depth = 1;
+    while (*p && depth > 0) {
+        if (*p == '{') depth++;
+        else if (*p == '}') depth--;
+        p++;
     }
-    for (int i = j; i < strlen(token); i++){
-        if (token[i] == ' '){
-            if (flag && token[i+1] == ' ') continue;
-            else if (token[i+1] != ' ') {
-                arr[index++] = i;
-            }
-            flag = true;
-        }
-        else {
-            flag = false;
-            continue;
-        }
+    if (depth > 0) {
+        fprintf(stderr, "Error: Unbalanced braces\n");
+        exit(1);
     }
-    arr[index++] = strlen(token);
-    return arr;
+    size_t len = (p - 1) - start;
+    char* block = malloc(len + 1);
+    memcpy(block, start, len);
+    block[len] = '\0';
+    *pp = p;
+    return block;
 }
 
-char* slicing(int start,int stop, char* token){
-    int i;
-    char* str = (char*)malloc(sizeof(char) *(stop-start+1));
-    for (i = start; i < stop; i++){
-        if (token[i] == ' ') break;
-        char c = token[i];
-        str[i-start] = token[i];
+static char* get_parentheses(char** pp) {
+    char* p = *pp;
+    p = skip_ws(p);
+    if (*p != '(') return NULL;
+    p++;
+    char* start = p;
+    int depth = 1;
+    while (*p && depth > 0) {
+        if (*p == '(') depth++;
+        else if (*p == ')') depth--;
+        p++;
     }
-    str[i-start] = '\0';
-    return str;
+    if (depth > 0) {
+        fprintf(stderr, "Error: Unbalanced parentheses\n");
+        exit(1);
+    }
+    size_t len = (p - 1) - start;
+    char* content = malloc(len + 1);
+    memcpy(content, start, len);
+    content[len] = '\0';
+    *pp = p;
+    return content;
 }
 
-char* extractTextBetweenParentheses(const char *input) {
-    const char *start = strchr(input, '(');
-    const char *end = strchr(input, ')');
-    char* text;
+static bool eval_cond_str(char* cond) {
+    char s1[128], op[16], s2[128];
+    char* p = cond;
+    while (*p && isspace((unsigned char)*p)) p++;
 
-    if (start != NULL && end != NULL && start < end) {
-        size_t length = end - start - 1;
-        char extractedText[length + 1];
-        strncpy(extractedText, start + 1, length);
-        text = (char*)malloc(strlen(extractedText) + 1);
-        extractedText[length] = '\0';
-        strcpy(text,extractedText);
-    } 
-    else {
-        exit(0);
-    }
-    return text;
-}
+    char* s = p;
+    while (*p && (isalnum((unsigned char)*p) || *p == '_')) p++;
+    int len = p - s;
+    if (len >= 128) len = 127;
+    memcpy(s1, s, len);
+    s1[len] = '\0';
 
-void split(char* token) {
-    int spaces = whitespaces(token);
-    char** chararr = (char**)malloc(sizeof(char*) * (spaces + 2));
-    
-    int* arr = arr_whitespaces(spaces, token);
-    char* str;
+    while (*p && isspace((unsigned char)*p)) p++;
+    s = p;
+    while (*p && (*p == '=' || *p == '!' || *p == '<' || *p == '>')) p++;
+    len = p - s;
+    if (len >= 16) len = 15;
+    memcpy(op, s, len);
+    op[len] = '\0';
 
-    int index = 0;
-    int start = 0;
-    while(true){
-        if (!isalpha(token[0]) && token[0] != ' ' && token[0]!= '}'){
-            printf("Can't begin with a non-alphabetic character: %s\n", token);
-            exit(0);
-        }
-        if (token[0] != ' '){
-            char* result = slicing(0, arr[1], token);
-            str = (char*)malloc(sizeof(char) * (strlen(result) + 1));
-            strcpy(str, result);
-            break;
-        }
-        if (token[arr[index]] != ' '){
-            char* result = slicing(arr[0]+1, arr[1], token);
-            str = (char*)malloc(sizeof(char) * (strlen(result) + 1));
-            strcpy(str, result);
-            start = 1;
-            break;
-        }
-        index++;
-    }
-    chararr[0] = (char*)malloc(sizeof(char) * (strlen(str) + 1));
-    strcpy(chararr[0], str);
-    free(str);
+    while (*p && isspace((unsigned char)*p)) p++;
+    s = p;
+    while (*p && (isalnum((unsigned char)*p) || *p == '_')) p++;
+    len = p - s;
+    if (len >= 128) len = 127;
+    memcpy(s2, s, len);
+    s2[len] = '\0';
 
+    if (!s1[0] || !op[0] || !s2[0]) return false;
 
-    for (int i = 1; i <= spaces; i++) {
-        char* str = slicing(arr[i] + 1, arr[i+1], token);
-        chararr[i] = (char*)malloc(sizeof(char) * (strlen(str) + 1));
-        strcpy(chararr[i], str);
-        free(str);
-    }
+    int v1, v2;
+    if (isdigit((unsigned char)s1[0]) || (s1[0] == '-' && isdigit((unsigned char)s1[1]))) v1 = atoi(s1);
+    else v1 = get_variable_value(s1, no_of_variables);
 
-    if (strcmp(chararr[0], "}") == 0) {
-        result = true;
-    }
+    if (isdigit((unsigned char)s2[0]) || (s2[0] == '-' && isdigit((unsigned char)s2[1]))) v2 = atoi(s2);
+    else v2 = get_variable_value(s2, no_of_variables);
 
-    if(result){
-        for (int i = 0; i < spaces + 1; i++) {
-            char *str_0 = "int\0";
-            char *str_1 = "=\0";
-            char *str_2 = "print\0";
-            char *str_3 = "if\0";
-
-            if (strcmp(chararr[i], str_0) == 0) {
-                create_variable(spaces,chararr,no_of_variables);
-                no_of_variables++;
-            }
-            else if (strcmp(chararr[i], str_1) == 0) {
-                assign_variable(spaces,no_of_variables,token,chararr);
-                break;
-            }
-            else if(strcmp(chararr[i], str_2) == 0) {
-                print_variable(token,no_of_variables,chararr,spaces);
-                break;
-            }
-            else if (strcmp(chararr[i], str_3) == 0) {
-                char* equation = extractTextBetweenParentheses(token);
-                int spaces_1 = whitespaces(equation);
-                char** chararr_1 = (char**)malloc(sizeof(char*) * (spaces_1 + 2));
-
-                int *arr_1 = arr_whitespaces(spaces_1, equation);
-                char* str_1;
-
-                int index_1 = 0;
-                int start_1 = 0;
-
-                while (true) {
-                    if (!isalpha(equation[0]) && equation[0] != ' '){
-                        printf("Can't begin with a non-alphabetic character: %s\n", equation);
-                        exit(0);
-                    }
-                    if (equation[0] != ' '){
-                        char* result_1 = slicing(0, arr_1[1], equation);
-                        str_1 = (char*)malloc(sizeof(char) * (strlen(result_1) + 1));
-                        strcpy(str_1, result_1);
-                        break;
-                    }
-                    if (equation[arr_1[index_1]] != ' '){
-                        char* result_1 = slicing(arr_1[0]+1, arr_1[1], equation);
-                        str_1 = (char*)malloc(sizeof(char) * (strlen(result_1) + 1));
-                        strcpy(str_1, result_1);
-                        start_1 = 1;
-                        break;
-                    }
-                    index_1 ++;
-                }
-
-                chararr_1[0] = (char*)malloc(sizeof(char) * (strlen(str_1) + 1));
-                strcpy(chararr_1[0], str_1);
-                free(str_1);
-
-                for (int i = 1; i <= spaces_1; i++) {
-                    char* str_2 = slicing(arr_1[i] + 1, arr_1[i+1], equation);
-                    chararr_1[i] = (char*)malloc(sizeof(char) * (strlen(str_2) + 1));
-                    strcpy(chararr_1[i], str_2);
-                    free(str_2);
-                }
-
-                int l_value;
-
-                if (isValidVariable(chararr_1[0])){
-                    l_value = get_variable_value(chararr_1[0],no_of_variables);
-                }
-                else if(isNumber(chararr_1[0])){
-                    l_value = atoi(chararr_1[0]);
-                }
-
-                char* operator = (char*)malloc(sizeof(char) * (strlen(chararr_1[1]) + 1));
-                strcpy(operator, chararr_1[1]);
-
-                int r_value;
-
-                if (isValidVariable(chararr_1[2])){
-                    r_value = get_variable_value(chararr_1[2],no_of_variables);
-                }
-                else if(isNumber(chararr_1[2])){
-                    r_value = atoi(chararr_1[2]);
-                }
-
-                result = evaluate_condition(l_value, operator, r_value);
-            }
-            else if (strcmp(chararr[i], "}") == 0 && i == 0) {
-                continue;
-            }
-        }
-    }
+    return evaluate_condition(v1, op, v2);
 }
 
 void execute_c_minus_minus(char *code) {
-    char* token = strtok(code, ";");
-    int value = 0;
+    if (!code) return;
+    char *p = code;
+    while (*p) {
+        p = skip_ws(p);
+        if (!*p) break;
 
-    while (token != NULL) {
-        split(token);
-        token = strtok(NULL, ";");
+        if (strncmp(p, "if", 2) == 0 && (isspace((unsigned char)p[2]) || p[2] == '(')) {
+            p += 2;
+            char* cond = get_parentheses(&p);
+            char* true_block = get_block(&p);
+
+            char* false_block = NULL;
+            char* next_p = skip_ws(p);
+            if (strncmp(next_p, "else", 4) == 0 && (isspace((unsigned char)next_p[4]) || next_p[4] == '{')) {
+                p = next_p + 4;
+                false_block = get_block(&p);
+            }
+
+            if (eval_cond_str(cond)) {
+                execute_c_minus_minus(true_block);
+            } else if (false_block) {
+                execute_c_minus_minus(false_block);
+            }
+
+            free(cond);
+            free(true_block);
+            if (false_block) free(false_block);
+
+            p = skip_ws(p);
+            if (*p == ';') p++;
+        } else if (strncmp(p, "while", 5) == 0 && (isspace((unsigned char)p[5]) || p[5] == '(')) {
+            p += 5;
+            char* cond_str = get_parentheses(&p);
+            char* body = get_block(&p);
+
+            while (eval_cond_str(cond_str)) {
+                char* body_exec = strdup(body);
+                execute_c_minus_minus(body_exec);
+                free(body_exec);
+            }
+            free(cond_str);
+            free(body);
+
+            p = skip_ws(p);
+            if (*p == ';') p++;
+        } else if (*p == '}') {
+            p++;
+        } else {
+            char* start = p;
+            while (*p && *p != ';') p++;
+            size_t len = p - start;
+            char* stmt = malloc(len + 1);
+            memcpy(stmt, start, len);
+            stmt[len] = '\0';
+            if (*p == ';') p++;
+
+            split(stmt);
+            free(stmt);
+        }
     }
+}
+
+void split(char* token) {
+    if (!token) return;
+
+    int capacity = 10;
+    char** chararr = malloc(capacity * sizeof(char*));
+    int count = 0;
+
+    char* p = token;
+    while (*p) {
+        while (*p && isspace((unsigned char)*p)) p++;
+        if (!*p) break;
+        char* start = p;
+        while (*p && !isspace((unsigned char)*p)) p++;
+        int len = p - start;
+        if (count >= capacity) {
+            capacity *= 2;
+            chararr = realloc(chararr, capacity * sizeof(char*));
+        }
+        chararr[count] = malloc(len + 1);
+        memcpy(chararr[count], start, len);
+        chararr[count][len] = '\0';
+        count++;
+    }
+
+    if (count == 0) {
+        free(chararr);
+        return;
+    }
+
+    int spaces = count - 1;
+
+    if (strcmp(chararr[0], "int") == 0) {
+        create_variable(spaces, chararr, no_of_variables);
+        no_of_variables++;
+        bool has_equal = false;
+        for (int i = 0; i < count; i++) {
+            if (strcmp(chararr[i], "=") == 0) {
+                has_equal = true;
+                break;
+            }
+        }
+        if (has_equal) {
+            assign_variable(spaces, no_of_variables, token, chararr);
+        }
+    } else if (strcmp(chararr[0], "print") == 0) {
+        print_variable(token, no_of_variables, chararr, spaces);
+    } else {
+        bool has_equal = false;
+        for (int i = 0; i < count; i++) {
+            if (strcmp(chararr[i], "=") == 0) {
+                has_equal = true;
+                break;
+            }
+        }
+        if (has_equal) {
+            assign_variable(spaces, no_of_variables, token, chararr);
+        }
+    }
+
+    for (int i = 0; i < count; i++) free(chararr[i]);
+    free(chararr);
+}
+
+int whitespaces(char* token) {
+    int count = 0;
+    bool in_ws = true;
+    for (int i = 0; token[i]; i++) {
+        if (isspace((unsigned char)token[i])) {
+            if (!in_ws) count++;
+            in_ws = true;
+        } else {
+            in_ws = false;
+        }
+    }
+    return count;
+}
+
+int* arr_whitespaces(int spaces, char* token) {
+    int* arr = malloc((spaces + 2) * sizeof(int));
+    if (!arr) return NULL;
+    int count = 0;
+    bool in_ws = true;
+    arr[count++] = -1;
+    for (int i = 0; token[i]; i++) {
+        if (isspace((unsigned char)token[i])) {
+            if (!in_ws) arr[count++] = i;
+            in_ws = true;
+        } else {
+            in_ws = false;
+        }
+    }
+    arr[count] = strlen(token);
+    return arr;
+}
+
+char* slicing(int start, int stop, char* token) {
+    int len = stop - start;
+    if (len < 0) len = 0;
+    char* res = malloc(len + 1);
+    if (!res) return NULL;
+    memcpy(res, token + start, len);
+    res[len] = '\0';
+    return res;
 }
